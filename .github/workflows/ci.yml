@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'ap-south-2' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || secrets.ECR_REPOSITORY || 'sentiment-api' }}
 
 jobs:
   # ---------- 1. Test ----------
@@ -34,7 +34,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'ap-south-2' }}
 
       - name: Pull trained model from S3 (DVC)
         run: dvc pull
@@ -64,7 +64,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'ap-south-2' }}
 
       - name: Pull trained model from S3 (DVC)
         run: dvc pull
@@ -90,7 +90,7 @@ jobs:
     env:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-      EC2_USER: ${{ vars.EC2_USER }}
+      EC2_USER: ${{ vars.EC2_USER || secrets.EC2_USER || 'ec2-user' }}
       REGISTRY: ${{ needs.build-and-push.outputs.registry }}
     steps:
       - name: SSH into EC2 and run the new image
