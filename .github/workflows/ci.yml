@@ -1,13 +1,19 @@
 # .github/workflows/ci.yml
-name: CI
+name: CI/CD
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 jobs:
+  # ---------- 1. Test ----------
   test:
     runs-on: ubuntu-latest
     steps:
@@ -23,5 +29,99 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
 
-      - name: Run tests that don't need the model
-        run: pytest -q -m "not model"
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Pull trained model from S3 (DVC)
+        run: dvc pull
+
+      - name: Run all tests
+        run: pytest -q
+
+  # ---------- 2. Build and push image to ECR ----------
+  build-and-push:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.ecr.outputs.registry }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install DVC
+        run: pip install "dvc[s3]"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Pull trained model from S3 (DVC)
+        run: dvc pull
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY"
+          docker build -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" -f docker/Dockerfile .
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
+
+  # ---------- 3. Deploy to EC2 ----------
+  deploy:
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      EC2_USER: ${{ vars.EC2_USER }}
+      REGISTRY: ${{ needs.build-and-push.outputs.registry }}
+    steps:
+      - name: SSH into EC2 and run the new image
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" bash -s <<EOF
+          set -euo pipefail
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY
+          docker pull $IMAGE
+          docker rm -f sentiment-api 2>/dev/null || true
+          docker run -d --name sentiment-api --restart unless-stopped \
+            --env-file /home/ec2-user/sentiment-api.env \
+            -p 80:8000 $IMAGE
+          docker image prune -f
+          EOF
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sf "http://$EC2_HOST/health"; then
+              echo
+              echo "Deployment is healthy"
+              exit 0
+            fi
+            echo "Waiting for the service to start ($i/20)..."
+            sleep 10
+          done
+          echo "Health check failed"
+          exit 1

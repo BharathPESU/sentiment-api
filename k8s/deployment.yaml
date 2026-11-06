@@ -1,0 +1,48 @@
+# k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentiment-api
+  template:
+    metadata:
+      labels:
+        app: sentiment-api
+    spec:
+      containers:
+        - name: api
+          image: sentiment-api:local
+          imagePullPolicy: IfNotPresent   # use the image loaded into kind
+          ports:
+            - containerPort: 8000
+          env:
+            - name: LOG_LEVEL
+              value: "INFO"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment-api
+spec:
+  selector:
+    app: sentiment-api
+  ports:
+    - port: 80
+      targetPort: 8000
+
