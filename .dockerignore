@@ -1,0 +1,10 @@
+# .dockerignore
+.git
+.venv
+__pycache__
+.pytest_cache
+data
+mlruns
+outputs
+tests
+*.md
