@@ -1,4 +1,4 @@
 [core]
-    remote = localstorage
-['remote "localstorage"']
-    url = /home/bharath/dvc-storage
+    remote = s3storage
+['remote "s3storage"']
+    url = s3://bharath-mlops-practice/sentiment-api
