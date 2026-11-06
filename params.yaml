@@ -1,0 +1,8 @@
+# params.yaml
+train:
+  model_name: distilbert-base-uncased
+  train_size: 4000      # reduce to 1000 for a quick CPU test run
+  test_size: 1000
+  max_length: 256
+  epochs: 1
+  batch_size: 16
