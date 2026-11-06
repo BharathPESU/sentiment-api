@@ -1,0 +1,29 @@
+# dvc.yaml
+stages:
+  prepare:
+    cmd: python src/prepare_data.py
+    deps:
+      - src/prepare_data.py
+    params:
+      - train.train_size
+      - train.test_size
+    outs:
+      - data/train.csv
+      - data/test.csv
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - data/train.csv
+      - data/test.csv
+    params:
+      - train.model_name
+      - train.max_length
+      - train.epochs
+      - train.batch_size
+    outs:
+      - models/sentiment
+    metrics:
+      - metrics.json:
+          cache: false

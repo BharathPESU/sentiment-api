@@ -1,0 +1,53 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python src/prepare_data.py
+    deps:
+    - path: src/prepare_data.py
+      hash: md5
+      md5: 7690bcf673a5a3ba19a9249facec2913
+      size: 714
+    params:
+      params.yaml:
+        train.test_size: 1000
+        train.train_size: 4000
+    outs:
+    - path: data/test.csv
+      hash: md5
+      md5: 94397ff3cfabb18bd620f4478998ac42
+      size: 1223096
+    - path: data/train.csv
+      hash: md5
+      md5: afdafdd136a0a8aeaa87321e93ae9321
+      size: 5244896
+  train:
+    cmd: python src/train.py
+    deps:
+    - path: data/test.csv
+      hash: md5
+      md5: 94397ff3cfabb18bd620f4478998ac42
+      size: 1223096
+    - path: data/train.csv
+      hash: md5
+      md5: afdafdd136a0a8aeaa87321e93ae9321
+      size: 5244896
+    - path: src/train.py
+      hash: md5
+      md5: e6149207a30ce95b114a5e24017b5e19
+      size: 2810
+    params:
+      params.yaml:
+        train.batch_size: 16
+        train.epochs: 1
+        train.max_length: 256
+        train.model_name: distilbert-base-uncased
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 518831d87562dec99817a8e067c6e056
+      size: 39
+    - path: models/sentiment
+      hash: md5
+      md5: 580626be0767280ada447903f54dc5d9.dir
+      size: 268550390
+      nfiles: 5
