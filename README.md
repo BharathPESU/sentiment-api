@@ -50,12 +50,13 @@ An end-to-end production-grade MLOps system for sentiment analysis on movie revi
 ## Tech Stack
 
 - **Model**: DistilBERT (`distilbert-base-uncased`) via Hugging Face Transformers & PyTorch
+- **UI & Web Interface**: Streamlit with interactive customer review analysis, probability breakdown, batch CSV processing, and export
 - **API**: FastAPI with Pydantic request/response validation & Uvicorn
 - **Tracking & Versioning**: MLflow (experiment metrics/params), DVC (data & model weights)
 - **Monitoring**: Prometheus (`prometheus-fastapi-instrumentator`), Two-sample Kolmogorov-Smirnov test for data drift
 - **Orchestration**: Prefect 3.0 (retraining workflow with accuracy quality gate)
-- **Containerization**: Docker (multi-stage CPU-optimized image with non-root security)
-- **CI/CD**: GitHub Actions (automated test runner)
+- **Containerization & Gateway**: Docker + Nginx reverse proxy (exposes Port 80 for Streamlit UI and FastAPI endpoints)
+- **CI/CD**: GitHub Actions (automated test runner and EC2 continuous deployment)
 
 ---
 
